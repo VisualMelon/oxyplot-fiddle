@@ -1,14 +1,101 @@
 ﻿<!DOCTYPE html>
 <html>
 <head>
+    <title>OxyPlot Blazor Fiddle</title>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width" />
-    <title>OxySnippet</title>
-    <base href="/" />
-</head>
-<body>
-    <app>Loading...</app>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <script src="_framework/blazor.webassembly.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.8.0/css/bulma.min.css">
+    <script defer src="https://use.fontawesome.com/releases/v5.3.1/js/all.js"></script>
+
+    <script src="https://pagecdn.io/lib/ace/1.4.6/ace.js" integrity="sha256-CVkji/u32aj2TeC+D13f7scFSIfphw2pmu4LaKWMSY8=" crossorigin="anonymous"></script>
+
+    <base href="/" />
+    <script>
+        var defaultScript = `using System;
+using OxyPlot;
+using OxyPlot.Axes;
+using OxyPlot.Series;
+class Program
+{
+    static void Main()
+    {
+    }
+
+    public static PlotModel Plot()
+    {
+        var model = new PlotModel { Title = "OxyPlot on Blazor!" };
+        model.Axes.Add(new LinearAxis { Position = AxisPosition.Left });
+        model.Axes.Add(new LinearAxis { Position = AxisPosition.Bottom });
+        model.Series.Add(new FunctionSeries(Math.Sin, 0, 10, 1000));
+        return model;
+    }
+}`;
+
+        var blazorHandle;
+        var editor;
+
+        function initialiseJs(handle) {
+            // receive a reference to the C#
+            blazorHandle = handle;
+        }
+
+        function onLoaded() {
+            editor = ace.edit("editor");
+            editor.setTheme("ace/theme/github");
+            editor.session.setMode("ace/mode/csharp");
+            editor.on("change", () => {
+                if (blazorHandle) {
+                    blazorHandle.invokeMethodAsync('ChangeCode', editor.getValue());
+                }
+            });
+            editor.setValue(defaultScript);
+            if (window.location.search) {
+                document.getElementById("editor").value = decodeURIComponent(window.location.search.substring(1));
+            }
+        }
+    </script>
+
+</head>
+<body onload="onLoaded()">
+    <section class="section">
+        <div class="container">
+            <article class="panel is-primary">
+                <p class="panel-heading">
+                    OxyPlot 2.0 Blazor Fiddle
+                </p>
+                <div class="panel-block">
+                    <div class="field is-horizontal is-expanded">
+                        <div class="field-label is-normal">
+                            <label class="label">Source</label>
+                        </div>
+                        <div class="field-body is-expanded">
+                            <div class="field">
+                                <div class="control">
+                                    <div id="editor" style="height: 400px; width: 800px">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="panel-block">
+                    <div class="field is-horizontal">
+                        <div class="field-label is-normal">
+                            <label class="label">SVG (OxyPlot.Core)</label>
+                        </div>
+                        <div class="field-body">
+                            <div class="field">
+                                <div class="control">
+                                    <app>Loading...</app>
+                                    <script src="_framework/blazor.webassembly.js"></script>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </article>
+        </div>
+    </section>
 </body>
 </html>

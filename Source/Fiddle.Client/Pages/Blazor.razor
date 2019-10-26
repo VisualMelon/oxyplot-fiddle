@@ -1,6 +1,7 @@
 ﻿@page "/blazor.html"
 @inject NavigationManager navigationManager
 @inject HttpClient Client
+@inject IJSRuntime Runtime
 @using System
 @using System.Collections.Generic
 @using System.IO
@@ -14,46 +15,30 @@
 @using Microsoft.CodeAnalysis.CSharp.Scripting
 @using Microsoft.CodeAnalysis.Scripting
 
-<h1>OxyPlot</h1>
-
-<textarea @bind="Code" rows="20" cols="80"></textarea>
-<button @onclick="CodeChanged">Refresh</button>
 
 @((MarkupString)Svg)
-@Errors
+<span style="color: red">@Errors</span>
 
 @code {
-    public string Errors { get; set; }
-    public string Code { get; set; } = @"using System;
-using OxyPlot;
-using OxyPlot.Axes;
-using OxyPlot.Series;
-class Program
-{
-    static void Main()
-    {
-    }
-
-    public static PlotModel Plot()
-    {
-        var model = new PlotModel { Title = ""OxyPlot on Blazor!"" };
-        model.Axes.Add(new LinearAxis { Position = AxisPosition.Left });
-        model.Axes.Add(new LinearAxis { Position = AxisPosition.Bottom });
-        model.Series.Add(new FunctionSeries(Math.Sin, 0, 10, 1000));
-        return model;
-    }
-}";
-    public string Svg { get; set; } = @"    <ellipse cx=""200""
-             cy=""80""
-             rx=""100""
-             ry=""50""
-             style=""fill:purple;stroke-width:10"" />";
+    public string Errors { get; set; } = "";
+    public string Code { get; set; } = "";
+    public string Svg { get; set; } = "";
 
     protected async override Task OnInitializedAsync()
     {
+        // pass the JS a reference to this
+        await Runtime.InvokeVoidAsync("initialiseJs", DotNetObjectReference.Create(this));
+
         // imports are only used by my broken Scripting modifications
         Runny.Compiler.Imports.AddRange(new[] { "System", "System.Linq", "System.Collections.Generic", "OxyPlot", "OxyPlot.Axes", "OxyPlot.Series", "OxyPlot.Annotations" });
         Runny.Compiler.InitializeMetadataReferences(Client);
+    }
+
+    [JSInvokable]
+    public async void ChangeCode(string newCode)
+    {
+        Code = newCode;
+        CodeChanged();
     }
 
     async void CodeChanged()
@@ -61,7 +46,51 @@ class Program
         Runny.Compiler.WhenReady(RunInternal);
     }
 
+    private const int NotWaiting = 0;
+    private const int Pending = 1;
+    private const int Running = 2;
+    private int WaitState = NotWaiting;
+
     async Task RunInternal()
+    {
+        int oldState;
+        while (System.Threading.Interlocked.CompareExchange(ref WaitState, Pending, oldState = WaitState) != oldState)
+        { // spin until we know what it was
+        }
+
+        if (oldState == NotWaiting)
+        { // start a wait loop
+            WaitLoop();
+            return;
+        }
+        else
+        { // there is an existing wait loop
+            return;
+        }
+    }
+
+    async void WaitLoop()
+    {
+    again:
+        while (System.Threading.Interlocked.CompareExchange(ref WaitState, Running, Pending) == Pending)
+        { // while pending, wait
+            await Task.Delay(500);
+        }
+
+        await DoUpdate();
+
+        if (System.Threading.Interlocked.CompareExchange(ref WaitState, NotWaiting, Running) == Running)
+        { // if nobody has changed from Running to something else, we are done
+            StateHasChanged(); // defer update if we are to spin again (does this make sense?)
+            return;
+        }
+        else
+        { // else, start again
+            goto again;
+        }
+    }
+
+    async Task DoUpdate()
     {
         var svgExporter = new OxyPlot.SvgExporter() { UseVerticalTextAlignmentWorkaround = true };
 
@@ -82,7 +111,7 @@ class Program
         var (success, asm) = Runny.Compiler.LoadSource(Code);
         if (success)
         {
-            Errors = "success";
+            Errors = "";
             try
             {
                 var plotModel = (global::OxyPlot.PlotModel)asm.GetType("Program").GetMethod("Plot").Invoke(null, new object[0]);
