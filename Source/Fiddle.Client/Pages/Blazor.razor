@@ -1,0 +1,101 @@
+﻿@page "/blazor.html"
+@inject NavigationManager navigationManager
+@inject HttpClient Client
+@using System
+@using System.Collections.Generic
+@using System.IO
+@using System.Linq
+@using System.Net.Http
+@using System.Reflection
+@using System.Text
+@using System.Threading.Tasks
+@using Microsoft.CodeAnalysis
+@using Microsoft.CodeAnalysis.CSharp
+@using Microsoft.CodeAnalysis.CSharp.Scripting
+@using Microsoft.CodeAnalysis.Scripting
+
+<h1>OxyPlot</h1>
+
+<textarea @bind="Code" rows="20" cols="80"></textarea>
+<button @onclick="CodeChanged">Refresh</button>
+
+@((MarkupString)Svg)
+@Errors
+
+@code {
+    public string Errors { get; set; }
+    public string Code { get; set; } = @"using System;
+using OxyPlot;
+using OxyPlot.Axes;
+using OxyPlot.Series;
+class Program
+{
+    static void Main()
+    {
+    }
+
+    public static PlotModel Plot()
+    {
+        var model = new PlotModel { Title = ""OxyPlot on Blazor!"" };
+        model.Axes.Add(new LinearAxis { Position = AxisPosition.Left });
+        model.Axes.Add(new LinearAxis { Position = AxisPosition.Bottom });
+        model.Series.Add(new FunctionSeries(Math.Sin, 0, 10, 1000));
+        return model;
+    }
+}";
+    public string Svg { get; set; } = @"    <ellipse cx=""200""
+             cy=""80""
+             rx=""100""
+             ry=""50""
+             style=""fill:purple;stroke-width:10"" />";
+
+    protected async override Task OnInitializedAsync()
+    {
+        // imports are only used by my broken Scripting modifications
+        Runny.Compiler.Imports.AddRange(new[] { "System", "System.Linq", "System.Collections.Generic", "OxyPlot", "OxyPlot.Axes", "OxyPlot.Series", "OxyPlot.Annotations" });
+        Runny.Compiler.InitializeMetadataReferences(Client);
+    }
+
+    async void CodeChanged()
+    {
+        Runny.Compiler.WhenReady(RunInternal);
+    }
+
+    async Task RunInternal()
+    {
+        var svgExporter = new OxyPlot.SvgExporter() { UseVerticalTextAlignmentWorkaround = true };
+
+        // doesn't work
+        //try
+        //{
+        //    var state = await Runny.Compiler.ExecScriptAsync(Code);
+        //    var plot = (OxyPlot.PlotModel)state.GetVariable("plot").Value;
+        //    Svg = svgExporter.ExportToString(plot);
+        //    return;
+        //}
+        //catch (Exception ex)
+        //{
+        //    Errors = ex.Message + "\n" + ex.StackTrace;
+        //}
+
+        // works
+        var (success, asm) = Runny.Compiler.LoadSource(Code);
+        if (success)
+        {
+            Errors = "success";
+            try
+            {
+                var plotModel = (global::OxyPlot.PlotModel)asm.GetType("Program").GetMethod("Plot").Invoke(null, new object[0]);
+                Svg = svgExporter.ExportToString(plotModel);
+            }
+            catch (Exception ex)
+            {
+                Errors = ex.Message + "\n" + ex.StackTrace;
+            }
+        }
+        else
+        {
+            Errors = "Compilation error";
+        }
+    }
+}

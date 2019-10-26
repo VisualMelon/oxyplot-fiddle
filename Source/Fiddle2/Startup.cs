@@ -18,7 +18,7 @@ namespace Fiddle2
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddControllers();
+            services.AddControllers().AddNewtonsoftJson();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -37,10 +37,12 @@ namespace Fiddle2
 
             app.UseDefaultFiles();
             app.UseStaticFiles();
+            app.UseClientSideBlazorFiles<Fiddle.Client.Startup>();
 
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapControllers();
+                //endpoints.MapFallbackToClientSideBlazor<Fiddle.Client.Startup>("Blazor.html");
             });
         }
     }
