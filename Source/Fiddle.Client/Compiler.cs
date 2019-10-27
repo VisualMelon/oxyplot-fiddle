@@ -104,7 +104,7 @@ namespace Runny
         public static (bool success, Assembly asm) LoadSource(string source)
         {
             var compilation = CSharpCompilation.Create("DynamicCode")
-                .WithOptions(new CSharpCompilationOptions(OutputKind.ConsoleApplication))
+                .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
                 .AddReferences(References)
                 .AddSyntaxTrees(CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview)/*.WithKind(SourceCodeKind.Script)*/));
             
